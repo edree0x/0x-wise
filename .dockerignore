@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+data
+models
+.env
+.env.*
+!.env.example
+*.log
+.git
+.gitignore
+tsconfig.tsbuildinfo
+worker/__pycache__
+**/__pycache__

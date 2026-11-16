@@ -1,0 +1,31 @@
+{
+  "name": "0x-wise",
+  "version": "0.1.0",
+  "private": true,
+  "description": "0x wise — self-hosted reading, listening and highlight review",
+  "scripts": {
+    "dev": "next dev -p 3210",
+    "build": "next build",
+    "start": "next start -p 3210",
+    "worker": "python3 worker/worker.py"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "jsdom": "^27.0.0",
+    "jszip": "^3.10.1",
+    "next": "16.4.6",
+    "pdfjs-dist": "^5.4.149",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "rss-parser": "^3.13.0",
+    "sanitize-html": "^2.17.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@types/sanitize-html": "^2.16.0",
+    "typescript": "^5.9.3"
+  }
+}

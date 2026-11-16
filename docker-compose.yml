@@ -1,0 +1,62 @@
+name: 0x-wise
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: 0xwise/app:0.1.0
+    restart: unless-stopped
+    user: "${OXW_UID:-1000}:${OXW_GID:-1000}"
+    ports:
+      - "${OXW_PORT:-3210}:3210"
+    environment:
+      OXW_DATA_DIR: /data
+      OXW_EMAIL: ${OXW_EMAIL:-me@0xwise.local}
+      OXW_PASSWORD: ${OXW_PASSWORD:-0xwise}
+      OXW_INSECURE: ${OXW_INSECURE:-1}
+      OXW_CRON_TOKEN: ${OXW_CRON_TOKEN:-change-me-too}
+      OXW_AI_PROVIDER: ${OXW_AI_PROVIDER:-ollama}
+      OXW_AI_BASE_URL: ${OXW_AI_BASE_URL:-http://host.docker.internal:11434/v1}
+      OXW_AI_MODEL: ${OXW_AI_MODEL:-llama3.1:8b}
+      OXW_AI_API_KEY: ${OXW_AI_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3210/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    image: 0xwise/worker:0.1.0
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      OXW_BASE_URL: http://app:3210
+      OXW_CRON_TOKEN: ${OXW_CRON_TOKEN:-change-me-too}
+      OXW_POLL_MINUTES: ${OXW_POLL_MINUTES:-20}
+      OXW_WORKER_IDLE_SECONDS: ${OXW_WORKER_IDLE_SECONDS:-5}
+      OXW_WHISPER_MODEL: ${OXW_WHISPER_MODEL:-small}
+      OXW_WHISPER_DEVICE: ${OXW_WHISPER_DEVICE:-auto}
+      OXW_WHISPER_COMPUTE: ${OXW_WHISPER_COMPUTE:-int8}
+      OXW_MAX_MEDIA_MB: ${OXW_MAX_MEDIA_MB:-2048}
+      OXW_MEDIA_DIR: /data/media
+      OXW_UID: ${OXW_UID:-1000}
+      OXW_GID: ${OXW_GID:-1000}
+      HF_HOME: /models
+    volumes:
+      - ./data:/data
+      - ./models:/models

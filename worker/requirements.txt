@@ -1,0 +1,10 @@
+# 0x wise worker — transcription and feed polling.
+#
+# faster-whisper pulls ctranslate2, which needs libgomp at runtime (installed in
+# the Dockerfile). yt-dlp changes often because YouTube changes often; bump this
+# pin when a download starts failing.
+faster-whisper==1.2.1
+# faster-whisper 1.2.1 calls av.open(..., metadata_errors="ignore"), which av 17
+# removed. Pin the last major version that still accepts it.
+av==16.1.0
+yt-dlp>=2026.10.26

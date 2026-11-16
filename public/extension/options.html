@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0x wise Clipper — settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="opt-card">
+      <header class="opt-head">
+        <img src="icons/icon-48.png" alt="" width="36" height="36" />
+        <div>
+          <p class="eyebrow">Browser extension</p>
+          <h1>0x wise Clipper</h1>
+          <p class="opt-sub">
+            Point this clipper at your own instance and paste a device token. Clips go straight to
+            <code>/api/clip</code> with a bearer token — no account, no third-party server.
+          </p>
+        </div>
+      </header>
+
+      <p class="status" id="status" role="status" hidden></p>
+
+      <form class="opt-form" id="settings-form">
+        <label class="field">
+          <span>0x wise address</span>
+          <input id="base-url" type="url" spellcheck="false" placeholder="http://localhost:3210" />
+          <small>Where your instance is served. Local network addresses work too.</small>
+        </label>
+
+        <label class="field">
+          <span>API token</span>
+          <div class="token-row">
+            <input id="api-token" type="password" spellcheck="false" autocomplete="off" placeholder="oxw_…" />
+            <button type="button" class="btn btn--soft" id="toggle-token">Show</button>
+          </div>
+          <small>
+            Create one in 0x wise under <strong>Integrations → API</strong>. It is shown once and only
+            its hash is stored on the server.
+          </small>
+        </label>
+
+        <div class="opt-actions">
+          <button type="submit" class="btn btn--primary" id="save">Save connection</button>
+          <button type="button" class="btn btn--ghost" id="test">Test connection</button>
+        </div>
+      </form>
+
+      <section class="opt-help">
+        <h2>Everyday use</h2>
+        <ol>
+          <li>Select a sentence on any page and click the 0x wise icon, then <strong>Clip selection</strong>.</li>
+          <li>Or right-click a page and choose <strong>Clip page to 0x wise</strong> for a bookmark.</li>
+          <li>Add a note in the popup before clipping to keep your first thought with the quote.</li>
+          <li>Highlights appear in the reader and in the review queue immediately.</li>
+        </ol>
+        <p class="hint">
+          The clipper keeps its token in this browser's extension storage. Revoke the token from
+          Integrations at any time and this extension stops working.
+        </p>
+      </section>
+
+      <footer class="opt-foot">
+        <span>0x wise · self-hosted · v2.0.0</span>
+      </footer>
+    </main>
+
+    <script src="options.js"></script>
+  </body>
+</html>

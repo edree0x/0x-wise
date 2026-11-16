@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clip to 0x wise</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="pop-head">
+      <div class="pop-brand">
+        <img src="icons/icon-48.png" alt="" width="26" height="26" />
+        <span>0x wise<span class="dot">.</span></span>
+      </div>
+      <button
+        type="button"
+        class="icon-btn"
+        id="settings-toggle"
+        aria-label="Clipper settings"
+        title="Clipper settings"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.1-1.55 1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.14.36.48.6.87.6H21a2 2 0 1 1 0 4h-.09c-.4 0-.73.24-.87.6Z" />
+        </svg>
+      </button>
+    </header>
+
+    <p class="status" id="status" role="status" hidden></p>
+    <p class="connect" id="connection" hidden></p>
+
+    <section class="page-card" aria-label="Current page">
+      <span class="page-mark" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+        </svg>
+      </span>
+      <span class="page-copy">
+        <strong id="page-title">Reading the page…</strong>
+        <span id="page-url"></span>
+      </span>
+    </section>
+
+    <section class="selection" aria-label="Selected text">
+      <p class="label">Selection</p>
+      <blockquote id="selection-preview" hidden></blockquote>
+      <p class="selection-empty" id="selection-empty">
+        Highlight a sentence on the page first, or clip the page as a bookmark.
+      </p>
+    </section>
+
+    <label class="field">
+      <span>Note <em>optional</em></span>
+      <textarea id="note" rows="2" placeholder="Why does this matter to you?"></textarea>
+    </label>
+
+    <div class="actions">
+      <button type="button" class="btn btn--primary" id="clip-selection" disabled>
+        Clip selection
+      </button>
+      <button type="button" class="btn btn--ghost" id="clip-page">Clip page</button>
+    </div>
+
+    <footer class="pop-foot">
+      <button type="button" class="foot-link" id="open-library">Open library</button>
+      <span>Self-hosted · v2.0.0</span>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
