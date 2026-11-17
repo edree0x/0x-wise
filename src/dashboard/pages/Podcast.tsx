@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { Icon } from '../icons'
 import { Cover, EmptyState, Tag } from '../ui'
 import { formatDate } from '../utils'
+import type { Doc } from '../types'
 
 function stamp(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds))
@@ -22,11 +23,42 @@ export function PodcastPage({
   onBack: () => void
   onOpenSources: () => void
 }) {
-  const { data, actions, showToast } = useStore()
-  const doc = data.docs.find((item) => item.id === docId)
+  const { data, actions, showToast, getPreviewEpisode } = useStore()
+  const libraryDoc = data.docs.find((item) => item.id === docId)
+  const preview = !libraryDoc ? getPreviewEpisode(docId) : null
+  const isPreview = Boolean(preview && !libraryDoc)
+  const doc: Doc | null = libraryDoc
+    ? libraryDoc
+    : preview
+      ? {
+          id: docId,
+          title: preview.title,
+          author: preview.author || preview.show?.author || preview.show?.name || 'Unknown',
+          source: preview.show?.name || 'Podcast preview',
+          url: preview.url || preview.feedUrl,
+          category: 'Podcast',
+          addedAt: new Date().toISOString(),
+          minutes: preview.durationSec ? Math.max(1, Math.round(preview.durationSec / 60)) : 1,
+          progress: 0,
+          favorite: false,
+          archived: false,
+          color: 'clay',
+          summary: preview.description || 'Preview episode',
+          content: preview.content || [],
+          tags: [],
+          kind: 'podcast',
+          cover: preview.artwork || preview.show?.artwork,
+          audioUrl: preview.audioUrl,
+          durationSec: preview.durationSec,
+          publishedAt: preview.publishedAt,
+          transcript: [],
+          chapters: [],
+          status: 'ready',
+        }
+      : null
   const highlights = useMemo(
-    () => data.highlights.filter((highlight) => highlight.docId === docId),
-    [data.highlights, docId],
+    () => (isPreview ? [] : data.highlights.filter((highlight) => highlight.docId === docId)),
+    [data.highlights, docId, isPreview],
   )
   const audioRef = useRef<HTMLAudioElement>(null)
   const [current, setCurrent] = useState(0)
@@ -39,10 +71,10 @@ export function PodcastPage({
         <EmptyState
           icon="listen"
           title="Episode not found"
-          body="It may have been deleted. Go back to Listen to see the rest of your queue."
+          body="It may have been deleted or this preview is no longer available. Go back to Listen or Discover."
           action={
             <button type="button" className="btn btn--primary btn--small" onClick={onBack}>
-              Back to Listen
+              Back
             </button>
           }
         />
@@ -61,6 +93,7 @@ export function PodcastPage({
   }
 
   const saveProgress = (value: number) => {
+    if (isPreview) return
     const next = Math.max(0, Math.min(100, Math.round(value)))
     if (Math.abs(next - doc.progress) >= 2) actions.updateDoc(doc.id, { progress: next })
   }
@@ -71,6 +104,10 @@ export function PodcastPage({
   }
 
   const clip = (text: string, start: number) => {
+    if (isPreview) {
+      showToast('Follow this podcast to save highlights to your library', 'error')
+      return
+    }
     const id = actions.addHighlight({
       docId: doc.id,
       text,
@@ -105,6 +142,7 @@ export function PodcastPage({
               ))}
             </div>
           ) : null}
+          {isPreview ? <p className="tag-pill">Preview · not saved to library</p> : null}
           {doc.summary ? <p className="podcast-summary">{doc.summary}</p> : null}
 
           {doc.audioUrl ? (
@@ -156,7 +194,7 @@ export function PodcastPage({
                   : 'Transcription runs locally with faster-whisper on this machine.'}
               </p>
             </div>
-            {!transcript.length && doc.audioUrl ? (
+            {!transcript.length && doc.audioUrl && !isPreview ? (
               <button
                 type="button"
                 className="btn btn--soft btn--small"

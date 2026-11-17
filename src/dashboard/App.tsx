@@ -14,6 +14,7 @@ import { SettingsPage } from './pages/Settings'
 import { ListenPage } from './pages/Listen'
 import { PodcastPage } from './pages/Podcast'
 import { SourcesPage } from './pages/Sources'
+import { DiscoverPage } from './pages/Discover'
 import type { ThemeName } from './types'
 
 type Route =
@@ -22,6 +23,7 @@ type Route =
   | { name: 'reader'; id: string }
   | { name: 'listen' }
   | { name: 'podcast'; id: string }
+  | { name: 'discover' }
   | { name: 'highlights' }
   | { name: 'notes' }
   | { name: 'sources' }
@@ -38,6 +40,7 @@ const NAV: { path: string; label: string; icon: IconName; route: Route['name'] }
   { path: 'review', label: 'Review', icon: 'review', route: 'review' },
   { path: 'library', label: 'Library', icon: 'library', route: 'library' },
   { path: 'listen', label: 'Listen', icon: 'listen', route: 'listen' },
+  { path: 'discover', label: 'Discover', icon: 'search', route: 'discover' },
   { path: 'highlights', label: 'Highlights', icon: 'highlighter', route: 'highlights' },
   { path: 'notes', label: 'Notes', icon: 'notes', route: 'notes' },
 ]
@@ -55,6 +58,7 @@ const TITLES: Record<Route['name'], string> = {
   reader: 'Reader',
   listen: 'Listen',
   podcast: 'Episode',
+  discover: 'Discover',
   highlights: 'Highlights',
   notes: 'Notes',
   sources: 'Sources',
@@ -65,11 +69,13 @@ const TITLES: Record<Route['name'], string> = {
 
 function parseRoute(): Route {
   const raw = window.location.hash.replace(/^#\/?/, '')
-  const [segment, id] = raw.split('/')
+  const [segment, ...rest] = raw.split('/')
+  const id = rest.join('/')
   if (segment === 'library') return { name: 'library' }
   if (segment === 'read' && id) return { name: 'reader', id }
   if (segment === 'listen') return { name: 'listen' }
   if (segment === 'episode' && id) return { name: 'podcast', id }
+  if (segment === 'discover') return { name: 'discover' }
   if (segment === 'highlights') return { name: 'highlights' }
   if (segment === 'notes') return { name: 'notes' }
   if (segment === 'sources') return { name: 'sources' }
@@ -205,6 +211,8 @@ export function App() {
         )
       case 'podcast':
         return <PodcastPage docId={route.id} onBack={() => navigate('listen')} onOpenSources={() => navigate('sources')} />
+      case 'discover':
+        return <DiscoverPage onOpenEpisode={(id) => navigate(`episode/${id}`)} />
       case 'sources':
         return (
           <SourcesPage

@@ -62,7 +62,7 @@ export function parseDuration(value: string | undefined): number | undefined {
   return parts[0]
 }
 
-function stripHtml(value: string | undefined): string {
+export function stripHtml(value: string | undefined): string {
   if (!value) return ''
   return unwrapCdata(value)
     .replace(/<[^>]+>/g, ' ')
@@ -70,6 +70,57 @@ function stripHtml(value: string | undefined): string {
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+export type PreviewEpisode = {
+  id: string
+  title: string
+  description: string
+  content: string[]
+  audioUrl?: string
+  durationSec?: number
+  publishedAt?: string
+  artwork?: string
+  url?: string
+  author?: string
+}
+
+export async function fetchFeedEpisodes(feedUrl: string, limit = 50): Promise<PreviewEpisode[]> {
+  const response = await fetchText(feedUrl)
+  if (response.status >= 400) {
+    throw new Error(`Feed responded ${response.status}`)
+  }
+  const parser = new Parser({
+    customFields: { item: ['content:encoded', 'dc:creator', 'itunes', 'image'] },
+  })
+  const feed = await parser.parseString(response.body)
+  const items = (feed.items ?? []).slice(0, limit) as FeedItem[]
+  return items
+    .map((item, index) => {
+      const encoded = item['content:encoded'] ?? item.content ?? item.summary ?? ''
+      const paragraphs = htmlToParagraphs(encoded)
+      const audioUrl = item.enclosure?.url
+      const durationSec = parseDuration(item.itunes?.duration)
+      const publishedAt = item.isoDate ?? (item.pubDate ? new Date(item.pubDate).toISOString() : undefined)
+      const artwork =
+        typeof item.image === 'string' ? item.image : item.image?.url ?? item.itunes?.image ?? undefined
+      const description = stripHtml(item.contentSnippet ?? item.summary ?? encoded).slice(0, 320)
+      const guid = (item.guid ?? item.link ?? `${index}`).toString()
+      return {
+        id: guid,
+        title: stripHtml(item.title) || 'Untitled episode',
+        description: description || (audioUrl ? 'Podcast episode' : 'Episode'),
+        content: paragraphs,
+        audioUrl,
+        durationSec,
+        publishedAt,
+        artwork,
+        url: (item.link ?? '').trim() || undefined,
+        author: stripHtml(item.creator ?? item['dc:creator'] ?? item.author ?? item.itunes?.author) ||
+          stripHtml(feed.title) || undefined,
+      }
+    })
+    .filter((item) => item.title || item.audioUrl || item.url)
 }
 
 export async function fetchText(

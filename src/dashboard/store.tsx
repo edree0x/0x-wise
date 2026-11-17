@@ -27,6 +27,39 @@ import type {
 } from './types'
 import { createSeedData } from './data'
 
+export type DiscoverResult = {
+  id: string
+  source: 'apple' | 'index'
+  name: string
+  author: string
+  url: string
+  feedUrl: string
+  artwork: string
+  description: string
+  categories: string[]
+  episodeCount?: number
+}
+
+export type PreviewEpisode = {
+  id: string
+  title: string
+  description: string
+  content: string[]
+  audioUrl?: string
+  durationSec?: number
+  publishedAt?: string
+  artwork?: string
+  url?: string
+  author?: string
+}
+
+export type PreviewShow = {
+  feedUrl: string
+  name: string
+  author: string
+  artwork: string
+}
+
 type Toast = { id: number; message: string; kind: ToastKind }
 
 type NewDocInput = {
@@ -72,6 +105,35 @@ type ActionResult = {
   error?: string
 }
 
+function encodePreviewPart(value: string): string {
+  return btoa(unescape(encodeURIComponent(value))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+function decodePreviewPart(value: string): string {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
+  const pad = base64.length % 4 ? '='.repeat(4 - (base64.length % 4)) : ''
+  return decodeURIComponent(escape(atob(base64 + pad)))
+}
+
+export function makePreviewEpisodeId(feedUrl: string, episodeId: string): string {
+  return `preview.${encodePreviewPart(feedUrl)}.${encodePreviewPart(episodeId)}`
+}
+
+export function parsePreviewEpisodeId(id: string): { feedUrl: string; episodeId: string } | null {
+  if (!id.startsWith('preview.')) return null
+  const rest = id.slice('preview.'.length)
+  const sep = rest.indexOf('.')
+  if (sep === -1) return null
+  try {
+    return {
+      feedUrl: decodePreviewPart(rest.slice(0, sep)),
+      episodeId: decodePreviewPart(rest.slice(sep + 1)),
+    }
+  } catch {
+    return null
+  }
+}
+
 type Actions = {
   rateHighlight: (id: string, rating: Rating) => void
   addHighlight: (input: NewHighlightInput) => string | null
@@ -98,15 +160,26 @@ type Actions = {
   deleteSource: (id: string) => void
   upload: (file: File) => Promise<{ ok: boolean; id?: string; error?: string } | null>
   transcribe: (id: string) => void
+  discover: (term: string, sources: string[]) => Promise<DiscoverResult[]>
+  subscribe: (result: DiscoverResult) => Promise<ActionResult | null>
+  fetchPreviewEpisodes: (feedUrl: string) => Promise<PreviewEpisode[]>
+  followShow: (input: { feedUrl: string; name?: string }) => Promise<ActionResult | null>
 }
 
-type StoreValue = {
+type PreviewState = {
+  shows: Record<string, PreviewShow>
+  episodesByFeed: Record<string, PreviewEpisode[]>
+}
+
+export type StoreValue = {
   data: AppData
   ready: boolean
   actions: Actions
   toast: Toast | null
   showToast: (message: string, kind?: ToastKind) => void
   dismissToast: () => void
+  getPreviewEpisode: (id: string) => (PreviewEpisode & { feedUrl: string; show?: PreviewShow }) | null
+  setPreviewShow: (show: PreviewShow) => void
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
@@ -131,6 +204,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(seed)
   const [ready, setReady] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
+  const [preview, setPreview] = useState<PreviewState>({ shows: {}, episodesByFeed: {} })
   const toastTimer = useRef<number | null>(null)
   const toastId = useRef(0)
   const queue = useRef<Promise<unknown>>(Promise.resolve())
@@ -251,6 +325,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute('content', colors[data.settings.theme])
   }, [data.settings.theme, data.settings.fontScale, data.settings.reduceMotion, data.settings.language])
+
+  const setPreviewShow = useCallback((show: PreviewShow) => {
+    setPreview((current) => ({ ...current, shows: { ...current.shows, [show.feedUrl]: show } }))
+  }, [])
+
+  const getPreviewEpisode = useCallback(
+    (id: string): (PreviewEpisode & { feedUrl: string; show?: PreviewShow }) | null => {
+      const parsed = parsePreviewEpisodeId(id)
+      if (!parsed) return null
+      const episodes = preview.episodesByFeed[parsed.feedUrl] ?? []
+      const episode = episodes.find((item) => item.id === parsed.episodeId)
+      if (!episode) return null
+      return { ...episode, feedUrl: parsed.feedUrl, show: preview.shows[parsed.feedUrl] }
+    },
+    [preview],
+  )
 
   const actions = useMemo<Actions>(() => {
     return {
@@ -498,12 +588,47 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }))
         void send('enqueueTranscribe', { id })
       },
+
+      discover: async (term, sources) => {
+        const res = await fetch(`/api/discover?q=${encodeURIComponent(term)}&sources=${sources.join(',')}`)
+        if (!res.ok) return []
+        const body = (await res.json()) as { results?: DiscoverResult[] }
+        return body.results ?? []
+      },
+
+      fetchPreviewEpisodes: async (feedUrl) => {
+        const res = await fetch(`/api/discover/episodes?feedUrl=${encodeURIComponent(feedUrl)}`)
+        let body: { episodes?: PreviewEpisode[]; error?: string } = {}
+        try {
+          body = (await res.json()) as { episodes?: PreviewEpisode[]; error?: string }
+        } catch {
+          body = {}
+        }
+        if (!res.ok || body.error) {
+          showToast(body.error || 'Could not load episodes', 'error')
+          return []
+        }
+        const episodes = body.episodes ?? []
+        setPreview((current) => ({
+          ...current,
+          episodesByFeed: { ...current.episodesByFeed, [feedUrl]: episodes },
+        }))
+        return episodes
+      },
+
+      followShow: async (input) => {
+        return send('addSource', { input: { url: input.feedUrl, kind: 'podcast', title: input.name } })
+      },
+
+      subscribe: async (result) => {
+        return send('addSource', { input: { url: result.feedUrl, kind: 'podcast', title: result.name } })
+      },
     }
-  }, [data.docs, request, send])
+  }, [data.docs, request, send, showToast])
 
   const value = useMemo<StoreValue>(
-    () => ({ data, ready, actions, toast, showToast, dismissToast }),
-    [data, ready, actions, toast, showToast, dismissToast],
+    () => ({ data, ready, actions, toast, showToast, dismissToast, getPreviewEpisode, setPreviewShow }),
+    [data, ready, actions, toast, showToast, dismissToast, getPreviewEpisode, setPreviewShow],
   )
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
