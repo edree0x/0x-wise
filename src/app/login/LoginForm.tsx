@@ -13,9 +13,17 @@ export function LoginForm() {
     setError('')
     setBusy(true)
     try {
+      // Read CSRF token from cookie for login request
+      const csrfCookie = document.cookie
+        .split('; ')
+        .find((row) => row.startsWith('oxw_csrf='))
+      const headers: Record<string, string> = { 'content-type': 'application/json' }
+      if (csrfCookie) {
+        headers['x-csrf-token'] = csrfCookie.split('=')[1]
+      }
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify({ email, password }),
       })
       const body = (await response.json().catch(() => ({}))) as { error?: string }

@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { insertDoc } from '@/lib/db'
 import { parseEpub } from '@/lib/epub'
 import { parsePdf } from '@/lib/pdf'
-import { json, withUser } from '@/lib/http'
+import { json, withUserAndCsrf } from '@/lib/http'
 import type { Doc } from '@/dashboard/types'
 
 export const maxDuration = 120
@@ -10,7 +10,7 @@ const MAX_BYTES = 40 * 1024 * 1024
 const COLORS = ['clay', 'sage', 'ink', 'sky', 'sand', 'moss', 'rose', 'slate']
 
 export async function POST(request: Request) {
-  return withUser(async () => {
+  return withUserAndCsrf(request, async () => {
     let form: FormData
     try {
       form = await request.formData()

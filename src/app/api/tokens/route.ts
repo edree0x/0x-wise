@@ -1,12 +1,12 @@
 import { createApiToken, listApiTokens, revokeApiToken } from '@/lib/auth'
-import { json, withUser } from '@/lib/http'
+import { json, withUser, withUserAndCsrf } from '@/lib/http'
 
 export async function GET() {
   return withUser(async () => json({ tokens: listApiTokens() }))
 }
 
 export async function POST(request: Request) {
-  return withUser(async (user) => {
+  return withUserAndCsrf(request, async (user) => {
     let body: { name?: string }
     try {
       body = (await request.json()) as { name?: string }
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  return withUser(async () => {
+  return withUserAndCsrf(request, async () => {
     const id = new URL(request.url).searchParams.get('id')
     if (!id) return json({ error: 'Missing token id' }, { status: 400 })
     revokeApiToken(id)

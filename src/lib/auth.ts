@@ -1,27 +1,40 @@
-import { randomBytes } from 'node:crypto'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { cookies } from 'next/headers'
-import { db, hashToken, nowIso, verifyPassword } from './db'
+import { auditLog, db, hashToken, nowIso, verifyPassword } from './db'
 
 export const SESSION_COOKIE = 'oxw_session'
+export const CSRF_COOKIE = 'oxw_csrf'
 const SESSION_DAYS = 60
 
 export type SessionUser = { id: string; email: string }
 
 type UserRow = { id: string; email: string; password_hash: string; salt: string }
 
-export function login(email: string, password: string): string | null {
+function generateCsrfToken(): string {
+  return randomBytes(32).toString('hex')
+}
+
+export function login(email: string, password: string): { token: string; csrfToken: string } | null {
   const user = db()
     .prepare('SELECT id, email, password_hash, salt FROM users WHERE lower(email) = lower(?)')
     .get(email.trim()) as UserRow | undefined
-  if (!user) return null
-  if (!verifyPassword(password, user.salt, user.password_hash)) return null
+  if (!user) {
+    auditLog('failedLogin', 'user-owner', { email: email.trim(), reason: 'user_not_found' })
+    return null
+  }
+  if (!verifyPassword(password, user.salt, user.password_hash)) {
+    auditLog('failedLogin', 'user-owner', { email: email.trim(), reason: 'invalid_password' })
+    return null
+  }
 
   const token = randomBytes(32).toString('hex')
+  const csrfToken = generateCsrfToken()
   const expires = new Date(Date.now() + SESSION_DAYS * 86_400_000).toISOString()
   db()
     .prepare('INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
     .run(hashToken(token), user.id, expires, nowIso())
-  return token
+  auditLog('login', user.id, { email: user.email })
+  return { token, csrfToken }
 }
 
 export function logout(token: string | undefined): void {
@@ -89,6 +102,7 @@ export function createApiToken(userId: string, name: string): { token: string; i
   db()
     .prepare('INSERT INTO api_tokens (id, user_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)')
     .run(id, userId, name || 'token', hashToken(token), nowIso())
+  auditLog('tokenCreate', userId, { tokenId: id, name: name || 'token' })
   return { token, id }
 }
 
@@ -106,6 +120,7 @@ export function listApiTokens(): { id: string; name: string; createdAt: string; 
 
 export function revokeApiToken(id: string): void {
   db().prepare('DELETE FROM api_tokens WHERE id = ?').run(id)
+  auditLog('tokenRevoke', 'user-owner', { tokenId: id })
 }
 
 export function sessionCookieOptions(token: string) {
@@ -118,4 +133,24 @@ export function sessionCookieOptions(token: string) {
     maxAge: SESSION_DAYS * 86_400,
     secure: process.env.NODE_ENV === 'production' && process.env.OXW_INSECURE !== '1',
   }
+}
+
+export function csrfCookieOptions(csrfToken: string) {
+  return {
+    name: CSRF_COOKIE,
+    value: csrfToken,
+    httpOnly: false, // Must be readable by JavaScript for double-submit pattern
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: SESSION_DAYS * 86_400,
+    secure: process.env.NODE_ENV === 'production' && process.env.OXW_INSECURE !== '1',
+  }
+}
+
+export function verifyCsrfToken(request: Request, cookieStore: Awaited<ReturnType<typeof cookies>>): boolean {
+  const headerToken = request.headers.get('x-csrf-token')
+  if (!headerToken) return false
+  const cookieToken = cookieStore.get(CSRF_COOKIE)?.value
+  if (!cookieToken) return false
+  return timingSafeEqual(Buffer.from(headerToken), Buffer.from(cookieToken))
 }

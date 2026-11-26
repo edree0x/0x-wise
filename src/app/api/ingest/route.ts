@@ -1,11 +1,11 @@
 import { findDocByUrl, getDoc } from '@/lib/db'
 import { createBookmarkDoc, ingestIntoDoc } from '@/lib/extract'
-import { json, withUser } from '@/lib/http'
+import { json, withUserAndCsrf } from '@/lib/http'
 
 export const maxDuration = 60
 
 export async function POST(request: Request) {
-  return withUser(async () => {
+  return withUserAndCsrf(request, async () => {
     let body: { url?: string; docId?: string; title?: string }
     try {
       body = (await request.json()) as { url?: string; docId?: string; title?: string }

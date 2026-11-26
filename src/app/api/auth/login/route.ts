@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers'
-import { login, logout, SESSION_COOKIE, sessionCookieOptions } from '@/lib/auth'
+import { login, logout, SESSION_COOKIE, CSRF_COOKIE, sessionCookieOptions, csrfCookieOptions } from '@/lib/auth'
 import { json } from '@/lib/http'
 
 export async function POST(request: Request) {
@@ -9,10 +9,11 @@ export async function POST(request: Request) {
   } catch {
     return json({ error: 'Invalid request' }, { status: 400 })
   }
-  const token = login(body.email ?? '', body.password ?? '')
-  if (!token) return json({ error: 'Wrong email or password' }, { status: 401 })
+  const result = login(body.email ?? '', body.password ?? '')
+  if (!result) return json({ error: 'Wrong email or password' }, { status: 401 })
   const store = await cookies()
-  store.set(sessionCookieOptions(token))
+  store.set(sessionCookieOptions(result.token))
+  store.set(csrfCookieOptions(result.csrfToken))
   return json({ ok: true })
 }
 
@@ -21,5 +22,6 @@ export async function DELETE() {
   const token = store.get(SESSION_COOKIE)?.value
   logout(token)
   store.delete(SESSION_COOKIE)
+  store.delete(CSRF_COOKIE)
   return json({ ok: true })
 }

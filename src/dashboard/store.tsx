@@ -171,7 +171,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ): Promise<ActionResult | null> => {
       let response: Response
       try {
-        response = await fetch(path, init)
+        // Add CSRF token header for cookie-authenticated requests
+        const headers = new Headers(init?.headers)
+        if (!headers.has('authorization') && !headers.has('x-api-token')) {
+          // Read CSRF token from cookie
+          const csrfCookie = document.cookie
+            .split('; ')
+            .find((row) => row.startsWith('oxw_csrf='))
+          if (csrfCookie) {
+            headers.set('x-csrf-token', csrfCookie.split('=')[1])
+          }
+        }
+        response = await fetch(path, { ...init, headers })
       } catch {
         if (!options.quiet) showToast('Cannot reach the server', 'error')
         return null

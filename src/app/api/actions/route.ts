@@ -1,8 +1,8 @@
 import { applyAction } from '@/lib/actions'
-import { json, withUser } from '@/lib/http'
+import { json, withUserAndCsrf } from '@/lib/http'
 
 export async function POST(request: Request) {
-  return withUser(async () => {
+  return withUserAndCsrf(request, async () => {
     let body: { type?: string; payload?: Record<string, unknown> }
     try {
       body = (await request.json()) as { type?: string; payload?: Record<string, unknown> }
