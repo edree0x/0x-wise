@@ -153,6 +153,15 @@ CREATE VIRTUAL TABLE IF NOT EXISTS highlights_fts USING fts5(
   note,
   tokenize = 'unicode61 remove_diacritics 2'
 );
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  details TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at DESC);
 `
 
 export function nowIso(): string {
@@ -218,6 +227,15 @@ export function setMeta(key: string, value: unknown): void {
   db()
     .prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     .run(key, JSON.stringify(value))
+}
+
+export function auditLog(eventType: string, userId: string, details?: Record<string, unknown>): void {
+  const id = `audit-${randomBytes(8).toString('hex')}`
+  db()
+    .prepare('INSERT INTO audit_log (id, event_type, user_id, details, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(id, eventType, userId, details ? JSON.stringify(details) : null, nowIso())
+  // Trim to last 500 rows
+  db().prepare('DELETE FROM audit_log WHERE id NOT IN (SELECT id FROM audit_log ORDER BY created_at DESC LIMIT 500)').run()
 }
 
 export function hashToken(token: string): string {

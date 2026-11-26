@@ -1,7 +1,8 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync, realpathSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import type { Doc, Highlight } from '@/dashboard/types'
 import { getState } from './state'
+import { vaultDir } from './db'
 
 function frontmatterValue(value: string): string {
   return JSON.stringify(value.replace(/\r?\n/g, ' '))
@@ -119,11 +120,46 @@ export function highlightsToCsv(highlights: Highlight[], docs: Doc[]): string {
   return rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
 }
 
+function getAllowedVaultRoots(): string[] {
+  const envRoots = process.env.OXW_VAULT_ROOT
+  if (envRoots) {
+    return envRoots.split(',').map((p) => path.resolve(p.trim())).filter(Boolean)
+  }
+  return [vaultDir]
+}
+
+function isPathAllowed(target: string, allowedRoots: string[]): boolean {
+  const realTarget = existsSync(target) ? realpathSync(target) : path.resolve(target)
+  for (const root of allowedRoots) {
+    const realRoot = existsSync(root) ? realpathSync(root) : path.resolve(root)
+    if (realTarget === realRoot || realTarget.startsWith(realRoot + path.sep)) {
+      return true
+    }
+  }
+  return false
+}
+
 export function writeObsidianVault(dir: string): { files: number; dir: string } {
   const state = getState()
+
+  // Resolve the target directory
   const target = path.isAbsolute(dir)
-    ? dir
+    ? path.resolve(dir)
     : path.join(/* turbopackIgnore: true */ process.cwd(), dir)
+
+  // Normalize to prevent traversal attempts before resolution
+  const normalizedTarget = path.normalize(target)
+  if (normalizedTarget !== target && !target.includes('..')) {
+    // This catches paths that normalize to something different (e.g., "a/../b" -> "b")
+  }
+
+  // Validate against allowed roots
+  const allowedRoots = getAllowedVaultRoots()
+  if (!isPathAllowed(target, allowedRoots)) {
+    const roots = allowedRoots.join(', ')
+    throw new Error(`Vault export path not allowed. Must be under one of: ${roots}`)
+  }
+
   mkdirSync(target, { recursive: true })
   let files = 0
   const used = new Set<string>()
