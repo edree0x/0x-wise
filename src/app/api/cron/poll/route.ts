@@ -1,13 +1,20 @@
 import { pollAllSources } from '@/lib/feeds'
 import { json } from '@/lib/http'
+import { timingSafeEqual } from 'node:crypto'
 
 export const maxDuration = 120
 
 function authorized(request: Request): boolean {
   const expected = process.env.OXW_CRON_TOKEN
-  if (!expected) return true
-  const url = new URL(request.url)
-  return request.headers.get('x-cron-token') === expected || url.searchParams.get('token') === expected
+  if (!expected) {
+    throw new Error('OXW_CRON_TOKEN is not set. This endpoint requires a cron token.')
+  }
+  const provided = request.headers.get('x-cron-token')
+  if (!provided) return false
+  const providedBuf = Buffer.from(provided)
+  const expectedBuf = Buffer.from(expected)
+  if (providedBuf.length !== expectedBuf.length) return false
+  return timingSafeEqual(providedBuf, expectedBuf)
 }
 
 export async function GET(request: Request) {
