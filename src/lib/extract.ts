@@ -120,23 +120,53 @@ export type Extraction = {
   url: string
 }
 
+async function fetchWithRedirectValidation(input: string): Promise<{ response: Response; finalUrl: string }> {
+  let currentUrl = await assertPublicUrl(input)
+  const maxRedirects = 3
+  let redirectCount = 0
+
+  while (redirectCount <= maxRedirects) {
+    const response = await fetch(currentUrl, {
+      headers: {
+        'user-agent': UA,
+        accept: 'text/html,application/xhtml+xml',
+        'accept-language': 'en,ar;q=0.8',
+      },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(25_000),
+    })
+
+    // Check if this is a redirect
+    const location = response.headers.get('location')
+    const isRedirect = [301, 302, 303, 307, 308].includes(response.status)
+
+    if (isRedirect && location && redirectCount < maxRedirects) {
+      // Validate the redirect target
+      try {
+        const redirectUrl = new URL(location, currentUrl)
+        currentUrl = await assertPublicUrl(redirectUrl.toString())
+        redirectCount += 1
+        continue
+      } catch {
+        throw new Error('Redirect target blocked by SSRF protection')
+      }
+    }
+
+    // Not a redirect, or max redirects reached - return the response
+    const finalUrl = response.url || currentUrl.toString()
+    return { response, finalUrl }
+  }
+
+  throw new Error('Too many redirects')
+}
+
 export async function extractUrl(input: string): Promise<Extraction> {
-  const url = await assertPublicUrl(input)
-  const response = await fetch(url, {
-    headers: {
-      'user-agent': UA,
-      accept: 'text/html,application/xhtml+xml',
-      'accept-language': 'en,ar;q=0.8',
-    },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(25_000),
-  })
+  const { response, finalUrl } = await fetchWithRedirectValidation(input)
   if (!response.ok) throw new Error(`Page responded ${response.status}`)
   const contentType = response.headers.get('content-type') ?? ''
   if (!contentType.includes('html') && !contentType.includes('xml')) {
     throw new Error('That URL is not an HTML page')
   }
-  const finalUrl = response.url || url.toString()
   const html = await response.text()
   const dom = new JSDOM(html, { url: finalUrl })
   const document = dom.window.document
@@ -177,7 +207,7 @@ export async function extractUrl(input: string): Promise<Extraction> {
 
   const content = blocksFromHtml(article?.content ?? document.body?.innerHTML ?? '', finalUrl)
   const words = content.join(' ').split(/\s+/).filter(Boolean).length
-  const title = (article?.title || ogTitle || textOf(document.querySelector('title')) || url.hostname).trim()
+  const title = (article?.title || ogTitle || textOf(document.querySelector('title')) || new URL(finalUrl).hostname).trim()
 
   dom.window.close()
 
@@ -188,7 +218,7 @@ export async function extractUrl(input: string): Promise<Extraction> {
   return {
     title,
     author: (article?.byline || authorMeta || 'Unknown').replace(/\s+/g, ' ').trim(),
-    source: (article?.siteName || ogSite || url.hostname.replace(/^www\./, '')).trim(),
+    source: (article?.siteName || ogSite || new URL(finalUrl).hostname.replace(/^www\./, '')).trim(),
     summary: (article?.excerpt || ogDescription || content[0] || '').replace(/\s+/g, ' ').slice(0, 400),
     content,
     cover: ogImage || undefined,
