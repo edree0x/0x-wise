@@ -97,8 +97,9 @@ All settings live in `.env` (Compose reads it automatically).
 | `OXW_EMAIL`      | `me@0xwise.local`     | Sign-in address, used when the database is first created |
 | `OXW_PASSWORD`   | `0xwise`              | Sign-in password                                 |
 | `OXW_INSECURE`   | `1`                   | `1` allows the session cookie over HTTP          |
-| `OXW_CRON_TOKEN` | `change-me-too`       | Shared secret for the worker and `/api/cron/poll` |
+| `OXW_CRON_TOKEN` | *required*            | Shared secret for the worker and `/api/cron/poll`. Must be set; endpoint returns 500 if unset. |
 | `OXW_DATA_DIR`   | `/data` in Docker     | SQLite, media and exports                        |
+| `OXW_VAULT_ROOT` | `/data/export`        | Comma-separated list of allowed root paths for Obsidian/Logseq vault export. The Docker `/vault` mount path should be added here. |
 | `OXW_UID` / `OXW_GID` | `1000`           | Owner of the bind-mounted folders                |
 
 The email and password are only read when the user row does not exist yet.
@@ -320,6 +321,8 @@ Example:
 curl -H "authorization: Bearer oxw_…" \
   "http://localhost:3210/api/v2/highlights?page_size=50"
 ```
+
+> **Note:** API tokens must be sent in the `Authorization: Bearer <token>` header or the `x-api-token` header. Query parameters (`?token=`, `?access_token=`) are no longer accepted.
 
 ## Development without Docker
 
