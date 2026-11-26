@@ -433,3 +433,109 @@ export function ColorDots({
     </span>
   )
 }
+
+/* ---------- Skeleton loading utilities ---------- */
+
+export function Skeleton({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <div
+      className={`skeleton ${className}`}
+      style={style}
+      aria-hidden="true"
+    />
+  )
+}
+
+export function SkeletonCard({ className = '' }: { className?: string }) {
+  return (
+    <div className={`panel skeleton-card ${className}`} aria-hidden="true">
+      <div className="skeleton" style={{ height: 16, width: '60%', marginBottom: 12 }} />
+      <div className="skeleton" style={{ height: 12, width: '40%', marginBottom: 8 }} />
+      <div className="skeleton" style={{ height: 12, width: '80%', marginBottom: 8 }} />
+      <div className="skeleton" style={{ height: 12, width: '50%' }} />
+    </div>
+  )
+}
+
+export function SkeletonList({ count = 4, className = '' }: { count?: number; className?: string }) {
+  return (
+    <div className={`skeleton-list ${className}`} aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="skeleton-list-item" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 0' }}>
+          <div className="skeleton" style={{ width: 48, height: 48, borderRadius: 8, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="skeleton" style={{ height: 14, width: '70%', marginBottom: 6 }} />
+            <div className="skeleton" style={{ height: 11, width: '50%' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function SkeletonDocCard({ className = '' }: { className?: string }) {
+  return (
+    <div className={`doc-card skeleton-doc-card ${className}`} aria-hidden="true">
+      <div className="skeleton" style={{ aspectRatio: '3 / 4.1', borderRadius: '4px 9px 9px 4px', marginBottom: 11 }} />
+      <div className="skeleton" style={{ height: 18, width: '90%', marginBottom: 4 }} />
+      <div className="skeleton" style={{ height: 12, width: '60%' }} />
+    </div>
+  )
+}
+
+export function SkeletonEpisodeCard({ className = '' }: { className?: string }) {
+  return (
+    <div className={`episode-card skeleton-episode-card ${className}`} aria-hidden="true" style={{ gap: 15, padding: 16 }}>
+      <div className="skeleton" style={{ width: 92, height: 92, borderRadius: 'var(--radius)', flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="skeleton" style={{ height: 11, width: '50%', marginBottom: 6 }} />
+        <div className="skeleton" style={{ height: 20, width: '85%', marginBottom: 4 }} />
+        <div className="skeleton" style={{ height: 20, width: '60%', marginBottom: 8 }} />
+        <div className="skeleton" style={{ height: 12, width: '40%', marginBottom: 8 }} />
+        <div className="skeleton" style={{ height: 4, width: '100%', borderRadius: 999 }} />
+      </div>
+    </div>
+  )
+}
+
+export function SkeletonHighlightCard({ className = '' }: { className?: string }) {
+  return (
+    <div className={`highlight-card skeleton-highlight-card ${className}`} aria-hidden="true" style={{ padding: '17px 20px 15px 22px' }}>
+      <div style={{ display: 'flex', justifyContent: 'spaceBetween', marginBottom: 9 }}>
+        <div className="skeleton" style={{ height: 11, width: '50%' }} />
+        <div className="skeleton" style={{ height: 16, width: 60, borderRadius: 999 }} />
+      </div>
+      <div className="skeleton" style={{ height: 20, width: '100%', marginBottom: 8 }} />
+      <div className="skeleton" style={{ height: 20, width: '90%', marginBottom: 8 }} />
+      <div className="skeleton" style={{ height: 14, width: '70%', marginBottom: 12 }} />
+      <div className="skeleton" style={{ height: 20, width: '30%', borderRadius: 999 }} />
+    </div>
+  )
+}
+
+export function SkeletonContinueCard({ className = '' }: { className?: string }) {
+  return (
+    <div className={`continue-card skeleton-continue-card ${className}`} aria-hidden="true" style={{ gap: 16, padding: '13px 16px 13px 13px' }}>
+      <div className="skeleton" style={{ width: 54, aspectRatio: '3 / 4.1', borderRadius: '3px 6px 6px 3px', flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="skeleton" style={{ height: 10, width: '40%', marginBottom: 4 }} />
+        <div className="skeleton" style={{ height: 20, width: '90%', marginBottom: 2 }} />
+        <div className="skeleton" style={{ height: 12, width: '60%', marginBottom: 6 }} />
+        <div className="skeleton" style={{ height: 4, width: '100%', borderRadius: 999 }} />
+      </div>
+      <div className="skeleton" style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0 }} />
+    </div>
+  )
+}
+
+export function SkeletonStatCard({ className = '' }: { className?: string }) {
+  return (
+    <div className={`stat-card skeleton-stat-card ${className}`} aria-hidden="true" style={{ gap: 12, padding: '14px 16px' }}>
+      <div className="skeleton" style={{ width: 38, height: 38, borderRadius: 9, flexShrink: 0 }} />
+      <div style={{ minWidth: 0 }}>
+        <div className="skeleton" style={{ height: 28, width: '70%', marginBottom: 2 }} />
+        <div className="skeleton" style={{ height: 11, width: '50%' }} />
+      </div>
+    </div>
+  )
+}
