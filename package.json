@@ -7,7 +7,15 @@
     "dev": "next dev -p 3210",
     "build": "next build",
     "start": "next start -p 3210",
-    "worker": "python3 worker/worker.py"
+    "worker": "python3 worker/worker.py",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write",
+    "format:check": "prettier --check",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
@@ -21,11 +29,19 @@
     "sanitize-html": "^2.17.0"
   },
   "devDependencies": {
+    "@next/eslint-plugin-next": "^16.4.6",
     "@types/jsdom": "^21.1.7",
-    "@types/node": "^24.10.0",
+    "@types/node": "^24.19.4",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@types/sanitize-html": "^2.16.0",
-    "typescript": "^5.9.3"
+    "@vitest/coverage-v8": "^2.1.9",
+    "eslint": "^9.39.5",
+    "eslint-plugin-next": "^0.0.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.10.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.74.0",
+    "vitest": "^2.1.9"
   }
 }

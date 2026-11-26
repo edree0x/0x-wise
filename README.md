@@ -134,6 +134,8 @@ provider error instead of blocking the reader.
 | `OXW_WHISPER_COMPUTE`     | `int8`  | `int8`, `int8_float16`, `float16`, `float32`       |
 | `OXW_MAX_MEDIA_MB`        | `2048`  | Refuse to download episodes larger than this       |
 | `OXW_WORKER_IDLE_SECONDS` | `5`     | Queue polling interval                             |
+| `OXW_BASE_URL`            | `http://app:3210` | Base URL of the app for worker API calls |
+| `OXW_MEDIA_DIR`           | `/data/media` | Directory for downloaded media |
 
 ## Everyday use
 
