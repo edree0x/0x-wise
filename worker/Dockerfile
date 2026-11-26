@@ -15,6 +15,7 @@ RUN apt-get update \
         libgomp1 \
         ca-certificates \
         gosu \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /worker
@@ -25,6 +26,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 COPY worker.py entrypoint.sh ./
 RUN chmod +x entrypoint.sh
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s \
+  CMD test -f /tmp/worker.heartbeat && [ $(($(date +%s) - $(stat -c %Y /tmp/worker.heartbeat))) -le 120 ] || exit 1
 
 VOLUME ["/models", "/data"]
 ENTRYPOINT ["./entrypoint.sh"]

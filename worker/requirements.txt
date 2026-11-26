@@ -7,4 +7,4 @@ faster-whisper==1.2.1
 # faster-whisper 1.2.1 calls av.open(..., metadata_errors="ignore"), which av 17
 # removed. Pin the last major version that still accepts it.
 av==16.1.0
-yt-dlp>=2026.10.26
+yt-dlp==2026.11.23

@@ -14,12 +14,15 @@ from __future__ import annotations
 import json
 import os
 import re
+import signal
 import sys
+import threading
 import time
 import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,10 +35,27 @@ DEVICE = os.environ.get("OXW_WHISPER_DEVICE", "auto").strip() or "auto"
 COMPUTE = os.environ.get("OXW_WHISPER_COMPUTE", "int8").strip() or "int8"
 MEDIA_DIR = Path(os.environ.get("OXW_MEDIA_DIR", "/data/media"))
 MAX_MEDIA_MB = max(64, int(os.environ.get("OXW_MAX_MEDIA_MB", "2048")))
+# Per-job wall-clock timeout for transcription (default 30 min)
+JOB_TIMEOUT_SEC = max(60, int(os.environ.get("OXW_JOB_TIMEOUT_SECONDS", "1800")))
+
+HEARTBEAT_PATH = Path("/tmp/worker.heartbeat")
+
+
+def _write_heartbeat() -> None:
+    """Write heartbeat file for Docker healthcheck."""
+    try:
+        HEARTBEAT_PATH.write_text(str(time.time()))
+    except Exception:
+        pass
+
 
 AUDIO_EXTS = {".mp3", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wav", ".flac", ".mp4", ".webm"}
 
 _model = None
+_shutdown = False
+_current_job_id: str | None = None
+_executor: ThreadPoolExecutor | None = None
+_poll_thread: threading.Thread | None = None
 
 
 def log(message: str) -> None:
@@ -193,13 +213,22 @@ def transcribe(path: Path) -> tuple[list[dict], str, float]:
     return collected, lang, duration
 
 
-def handle_transcribe(job: dict, doc: dict) -> None:
+def _transcribe_with_timeout(job: dict, doc: dict) -> dict:
+    """Run transcription with a wall-clock timeout. Returns result dict for the API."""
     path, audio_file = resolve_audio(job, doc)
     log(f"Transcribing {path.name} ({path.stat().st_size / (1024 * 1024):.1f} MB)")
     started = time.time()
-    transcript, lang, duration = transcribe(path)
+
+    # Run the actual transcription in the executor with timeout
+    future = _executor.submit(transcribe, path)
+    try:
+        transcript, lang, duration = future.result(timeout=JOB_TIMEOUT_SEC)
+    except FuturesTimeoutError:
+        raise RuntimeError(f"Transcription timed out after {JOB_TIMEOUT_SEC}s")
+
     if not transcript:
         raise RuntimeError("No speech was detected in this audio")
+
     log(
         f"Transcribed {len(transcript)} segments in {time.time() - started:.0f}s "
         f"(language={lang or 'auto'})"
@@ -213,6 +242,11 @@ def handle_transcribe(job: dict, doc: dict) -> None:
     }
     if audio_file:
         result["audioFile"] = audio_file
+    return result
+
+
+def handle_transcribe(job: dict, doc: dict) -> None:
+    result = _transcribe_with_timeout(job, doc)
     request("/api/worker/jobs", method="POST", body=result)
 
 
@@ -226,9 +260,57 @@ def poll_feeds() -> None:
         log(f"Feed poll failed: {error}")
 
 
+def _poll_loop() -> None:
+    """Background thread: polls feeds every POLL_MINUTES regardless of in-flight jobs."""
+    next_poll = 0.0
+    while not _shutdown:
+        now = time.time()
+        if now >= next_poll:
+            poll_feeds()
+            next_poll = time.time() + POLL_MINUTES * 60
+        _write_heartbeat()
+        # Sleep in small increments to check _shutdown promptly
+        time.sleep(min(1, IDLE_SECONDS))
+
+
+def _signal_handler(signum, frame):
+    global _shutdown
+    if _shutdown:
+        log("SIGTERM received again, forcing exit")
+        sys.exit(1)
+    log("SIGTERM received, finishing current job then exiting")
+    _shutdown = True
+    # The main loop will notice _shutdown and handle requeue of current job
+
+
+def _requeue_current_job(job_id: str, error: str) -> None:
+    """Report job failure so the app requeues it with backoff (or dead-letters)."""
+    try:
+        request(
+            "/api/worker/jobs",
+            method="POST",
+            body={"id": job_id, "ok": False, "error": error},
+        )
+        log(f"Requeued interrupted job {job_id}")
+    except Exception as report_error:  # noqa: BLE001
+        log(f"Could not report failure for requeue: {report_error}")
+
+
 def main() -> None:
-    log(f"0x wise worker starting · app={BASE_URL} · media={MEDIA_DIR}")
+    global _executor, _poll_thread, _shutdown
+
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
+
+    log(f"0x wise worker starting · app={BASE_URL} · media={MEDIA_DIR} · timeout={JOB_TIMEOUT_SEC}s")
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Start background feed polling thread (decoupled from transcription loop)
+    _poll_thread = threading.Thread(target=_poll_loop, daemon=True)
+    _poll_thread.start()
+
+    # Thread pool for transcription (single worker, so 1 thread is fine)
+    _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="transcribe")
 
     # A container restart can leave a job marked "running" forever. There is a
     # single worker, so anything still running at startup was cut short.
@@ -240,14 +322,8 @@ def main() -> None:
     except Exception as error:  # noqa: BLE001 - the loop retries below
         log(f"Could not recover interrupted jobs yet: {error}")
 
-    next_poll = 0.0
-
-    while True:
-        now = time.time()
-        if now >= next_poll:
-            poll_feeds()
-            next_poll = time.time() + POLL_MINUTES * 60
-
+    while not _shutdown:
+        _write_heartbeat()
         try:
             response = request("/api/worker/jobs")
         except Exception as error:  # noqa: BLE001 - app may still be booting
@@ -260,8 +336,9 @@ def main() -> None:
             time.sleep(IDLE_SECONDS)
             continue
 
+        _current_job_id = job.get("id")
         doc = response.get("doc") or {}
-        log(f"Job {job.get('id')} · {job.get('kind')} · {doc.get('title', 'untitled')}")
+        log(f"Job {_current_job_id} · {job.get('kind')} · {doc.get('title', 'untitled')}")
         try:
             if job.get("kind") == "transcribe":
                 handle_transcribe(job, doc)
@@ -279,6 +356,17 @@ def main() -> None:
                 )
             except Exception as report_error:  # noqa: BLE001
                 log(f"Could not report the failure: {report_error}")
+        finally:
+            _current_job_id = None
+
+    # Graceful shutdown: if we were interrupted mid-job, requeue it
+    if _current_job_id:
+        _requeue_current_job(_current_job_id, "Worker shut down (SIGTERM)")
+
+    # Cleanup
+    if _executor:
+        _executor.shutdown(wait=True)
+    log("Worker stopped gracefully")
 
 
 if __name__ == "__main__":
