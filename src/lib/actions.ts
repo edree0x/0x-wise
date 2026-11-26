@@ -12,6 +12,7 @@ import type {
 } from '@/dashboard/types'
 import { createSeedData } from '@/dashboard/data'
 import {
+  auditLog,
   db,
   deleteDocRow,
   deleteHighlightRow,
@@ -101,6 +102,7 @@ export async function applyAction(type: string, payload: Json): Promise<ActionRe
 
     case 'deleteHighlight': {
       deleteHighlightRow(String(payload.id))
+      auditLog('deleteHighlight', 'user-owner', { highlightId: String(payload.id) })
       return { data: getState() }
     }
 
@@ -178,7 +180,9 @@ export async function applyAction(type: string, payload: Json): Promise<ActionRe
     }
 
     case 'deleteDoc': {
-      deleteDocRow(String(payload.id))
+      const docId = String(payload.id)
+      deleteDocRow(docId)
+      auditLog('deleteDoc', 'user-owner', { docId })
       return { data: getState() }
     }
 
@@ -244,6 +248,10 @@ export async function applyAction(type: string, payload: Json): Promise<ActionRe
     }
 
     case 'resetAll': {
+      const { confirm } = payload as { confirm?: string }
+      if (confirm !== 'RESET') {
+        return { data: getState(), error: 'Confirm with payload.confirm = "RESET"' }
+      }
       const settings = getMeta('settings', createSeedData().settings)
       db().exec('DELETE FROM documents; DELETE FROM highlights; DELETE FROM sources; DELETE FROM jobs;')
       db().exec('DELETE FROM documents_fts; DELETE FROM highlights_fts;')
@@ -259,6 +267,7 @@ export async function applyAction(type: string, payload: Json): Promise<ActionRe
         dailyGoal: settings.dailyGoal,
         language: settings.language,
       })
+      auditLog('resetAll', 'user-owner', {})
       return { data: getState() }
     }
 
@@ -289,7 +298,9 @@ export async function applyAction(type: string, payload: Json): Promise<ActionRe
     }
 
     case 'deleteSource': {
-      db().prepare('DELETE FROM sources WHERE id = ?').run(String(payload.id))
+      const sourceId = String(payload.id)
+      db().prepare('DELETE FROM sources WHERE id = ?').run(sourceId)
+      auditLog('deleteSource', 'user-owner', { sourceId })
       return { data: getState() }
     }
 
