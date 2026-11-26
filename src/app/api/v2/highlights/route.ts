@@ -8,12 +8,7 @@ function token(request: Request): string | undefined {
     const match = header.match(/^(?:bearer|token)\s+(.+)$/i)
     if (match) return match[1].trim()
   }
-  return (
-    request.headers.get('x-api-token') ??
-    bearerToken(request) ??
-    new URL(request.url).searchParams.get('access_token') ??
-    undefined
-  )
+  return bearerToken(request) ?? request.headers.get('x-api-token') ?? undefined
 }
 
 function authorized(request: Request): boolean {
